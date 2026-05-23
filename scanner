@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Escáner de Placas Vehiculares - OCR Real</title>
+    <!-- Tesseract.js CDN para OCR real -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0b2b2f 0%, #05171c 100%);
+            font-family: 'Segoe UI', 'Poppins', system-ui, -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif;
+            min-height: 100vh;
+            padding: 1.5rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .app-container {
+            max-width: 900px;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(12px);
+            border-radius: 2.5rem;
+            padding: 1.5rem;
+            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+            transition: all 0.2s ease;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 1.8rem;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(120deg, #FFDFB3, #FFB347);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            letter-spacing: -0.5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header p {
+            color: #bcd4de;
+            margin-top: 8px;
+            font-size: 0.85rem;
+        }
+
+        .camera-frame {
+            background: #000000;
+            border-radius: 1.8rem;
+            overflow: hidden;
+            border: 2px solid #ffb347;
+            box-shadow: 0 12px 28px black;
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+
+        video {
+            width: 100%;
+            height: auto;
+            display: block;
+            background: #0a1a1f;
+        }
+
+        canvas {
+            display: none;
+        }
+
+        .button-panel {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .btn {
+            border: none;
+            background: #1e3a44;
+            padding: 0.9rem 1.8rem;
+            border-radius: 60px;
+            font-weight: bold;
+            font-size: 1rem;
+            color: white;
+            cursor: pointer;
+            transition: 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(4px);
+        }
+
+        .btn-primary {
+            background: #ff8c42;
+            color: #1e2a2f;
+            box-shadow: 0 0 12px rgba(255, 140, 66, 0.5);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #ffa25e;
+            transform: scale(1.02);
+            box-shadow: 0 0 18px #ff9e4a;
+        }
+
+        .btn-secondary {
+            background: #2a5f6e;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #3f7e91;
+            transform: translateY(-2px);
+        }
+
+        .btn:active {
+            transform: scale(0.97);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            filter: grayscale(0.1);
+        }
+
+        /* Tarjeta de resultado estilo placa */
+        .result-card {
+            background: #071e24e0;
+            backdrop-filter: blur(16px);
+            border-radius: 1.6rem;
+            padding: 1.4rem;
+            margin-top: 0.5rem;
+            border: 1px solid rgba(255, 180, 70, 0.5);
+            transition: all 0.2s;
+        }
+
+        .result-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #ffcd94;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .plate-card {
+            background: #0a0f12;
+            border-radius: 1.2rem;
+            padding: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            border-left: 8px solid #ffb347;
+            margin-top: 6px;
+        }
+
+        .plate-number {
+            font-family: 'Courier New', 'Fira Mono', monospace;
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: 4px;
+            background: linear-gradient(135deg, #FFF5E1, #FFDCA8);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            word-break: break-all;
+        }
+
+        .badge-confidence {
+            background: #2c5a44;
+            padding: 0.3rem 0.9rem;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: #e9f5e9;
+        }
+
+        .status-area {
+            margin-top: 12px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            background: #07141870;
+            border-radius: 60px;
+            padding: 0.5rem 1rem;
+        }
+
+        .status-text {
+            color: #cde5ed;
+        }
+
+        .error-text {
+            color: #ffb694;
+        }
+
+        .footer-note {
+            text-align: center;
+            font-size: 0.7rem;
+            color: #86a3ae;
+            margin-top: 1.5rem;
+        }
+
+        @media (max-width: 600px) {
+            .app-container {
+                padding: 1rem;
+            }
+            .plate-number {
+                font-size: 1.5rem;
+                letter-spacing: 2px;
+            }
+            .btn {
+                padding: 0.7rem 1.2rem;
+                font-size: 0.85rem;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <div class="header">
+        <h1>
+            <span>🚗🔍</span> SCAN PLATE
+        </h1>
+        <p>Escáner profesional de matrículas | OCR en tiempo real</p>
+    </div>
+
+    <div class="camera-frame">
+        <video id="videoCam" autoplay muted playsinline></video>
+        <canvas id="canvasOcr" style="display: none;"></canvas>
+    </div>
+
+    <div class="button-panel">
+        <button id="btnStartCamera" class="btn btn-primary">📷 INICIAR CÁMARA</button>
+        <button id="btnCapture" class="btn btn-secondary" disabled>🔎 ESCANEAR PLACA</button>
+    </div>
+
+    <!-- TARJETA donde se mostrará la placa detectada exactamente como se lea -->
+    <div class="result-card">
+        <div class="result-label">📋 PLACA DETECTADA (OCR REAL)</div>
+        <div class="plate-card">
+            <span id="detectedPlate" class="plate-number">— — —</span>
+            <span id="confidenceBadge" class="badge-confidence">⚡ esperando</span>
+        </div>
+        <div class="status-area">
+            <span id="statusMessage" class="status-text">🟢 Listo. Presiona "Iniciar Cámara" y enfoca una placa real.</span>
+        </div>
+        <div id="rawInfo" style="font-size: 0.7rem; margin-top: 10px; color: #b9d2dd; font-family: monospace;"></div>
+    </div>
+    <div class="footer-note">
+        💡 El sistema analiza la imagen actual y extrae el texto de la placa (letras+números).<br>
+        Ejemplo real: si la matrícula es <strong>T701029C</strong> lo mostrará exactamente abajo. Sin simulaciones.
+    </div>
+</div>
+
+<script>
+    (function() {
+        // --- Elementos del DOM ---
+        const video = document.getElementById('videoCam');
+        const canvas = document.getElementById('canvasOcr');
+        const btnStart = document.getElementById('btnStartCamera');
+        const btnCapture = document.getElementById('btnCapture');
+        const detectedPlateSpan = document.getElementById('detectedPlate');
+        const confidenceBadge = document.getElementById('confidenceBadge');
+        const statusMsgSpan = document.getElementById('statusMessage');
+        const rawInfoSpan = document.getElementById('rawInfo');
+
+        let mediaStream = null;
+        let cameraReady = false;
+        let ocrRunning = false;   // prevenir múltiples escaneos simultáneos
+
+        // Contexto del canvas para dibujar frames
+        const ctx = canvas.getContext('2d');
+
+        // --- Helper: Detener cámara correctamente ---
+        async function stopCameraTracks() {
+            if (mediaStream) {
+                const tracks = mediaStream.getTracks();
+                tracks.forEach(track => track.stop());
+                mediaStream = null;
+            }
+            if (video.srcObject) {
+                video.srcObject = null;
+            }
+            cameraReady = false;
+            btnCapture.disabled = true;
+        }
+
+        // --- Inicializar cámara trasera / frontal ---
+        async function startCamera() {
+            // Detener cualquier stream previo
+            await stopCameraTracks();
+            
+            try {
+                // Priorizar cámara trasera (environment) para mejor captura de placas
+                let constraints = {
+                    video: { facingMode: { exact: "environment" } }
+                };
+                try {
+                    mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+                } catch (envError) {
+                    console.warn("No se pudo acceder a cámara trasera, usando cámara frontal/predeterminada", envError);
+                    constraints = { video: true };
+                    mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+                }
+                
+                video.srcObject = mediaStream;
+                await video.play();
+                
+                // Esperar a que el video tenga dimensiones reales
+                await new Promise((resolve) => {
+                    if (video.videoWidth > 0 && video.videoHeight > 0) {
+                        resolve();
+                    } else {
+                        video.addEventListener('loadedmetadata', () => resolve(), { once: true });
+                    }
+                });
+                
+                cameraReady = true;
+                btnCapture.disabled = false;
+                statusMsgSpan.innerHTML = "✅ Cámara activa. Enfoca bien la placa y presiona ESCANEAR PLACA.";
+                statusMsgSpan.style.color = "#c8ffcf";
+                detectedPlateSpan.innerHTML = "— — —";
+                confidenceBadge.innerHTML = "⚡ esperando lectura";
+                rawInfoSpan.innerHTML = "";
+                return true;
+            } catch (err) {
+                console.error("Error al acceder a la cámara: ", err);
+                statusMsgSpan.innerHTML = "❌ Error de cámara: Permisos denegados o no hay cámara disponible.";
+                statusMsgSpan.style.color = "#ffbcbc";
+                cameraReady = false;
+                btnCapture.disabled = true;
+                return false;
+            }
+        }
+
+        // --- Función de limpieza inteligente para extraer exactamente el patrón de placa ---
+        // Queremos conservar letras mayúsculas, números y eventualmente guiones. Y mantener formato original.
+        // Ejemplo real: "T701029C" -> T701029C, "ABC123" -> ABC123, "AB 123 CD" -> AB123CD etc.
+        // Pero el usuario quiere: si la imagen tiene T701029C, que se muestre tal cual.
+        function cleanAndExtractPlate(rawText) {
+            if (!rawText) return "";
+            
+            // Convertir a mayúsculas para estandarizar
+            let upperRaw = rawText.toUpperCase().trim();
+            
+            // Eliminar caracteres no deseados: conservar letras A-Z, números 0-9, guiones y espacios (luego quitamos espacios)
+            let cleaned = upperRaw.replace(/[^A-Z0-9\-]/g, '');
+            
+            // Eliminar guiones al inicio o final (no deberían estar, pero limpiamos)
+            cleaned = cleaned.replace(/^-+|-+$/g, '');
+            
+            // Si después de limpiar hay espacios internos, los removemos para una placa compacta (típicamente no hay espacios en la plaga final)
+            cleaned = cleaned.replace(/\s/g, '');
+            
+            // Patrón común de placas: mínimo 4 caracteres, máximo 8 o 9 (dependiendo el país)
+            // Pero no limitamos fuertemente, sólo dejamos que el OCR decida, pero si es demasiado largo
+            if (cleaned.length > 12) {
+                // Podríamos tomar solo los primeros 12, pero es mejor quedarse con segmento alfanumérico continuo
+                // Intentamos extraer subcadena que tenga al menos 4 caracteres alfanuméricos
+                const matches = cleaned.match(/[A-Z0-9]{4,12}/g);
+                if (matches && matches.length > 0) {
+                    // Tomar la coincidencia más larga, suele ser la placa
+                    matches.sort((a,b) => b.length - a.length);
+                    return matches[0];
+                }
+                // fallback: devolver limpiado recortado
+                return cleaned.substring(0, 10);
+            }
+            
+            return cleaned;
+        }
+
+        // --- Función de OCR Real usando Tesseract sobre el canvas ---
+        async function performOcrOnCurrentFrame() {
+            if (!cameraReady || !video.srcObject || video.readyState !== 4) {
+                statusMsgSpan.innerHTML = "⚠️ Cámara no lista. Inicia la cámara primero.";
+                statusMsgSpan.style.color = "#ffbe8c";
+                return null;
+            }
+            
+            if (ocrRunning) {
+                statusMsgSpan.innerHTML = "⏳ Escaneo en curso, espera...";
+                return null;
+            }
+            
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+            if (vw === 0 || vh === 0) {
+                statusMsgSpan.innerHTML = "⏳ Obteniendo fotograma... espera un momento.";
+                return null;
+            }
+            
+            // Configurar canvas del mismo tamaño que el video
+            canvas.width = vw;
+            canvas.height = vh;
+            
+            // Dibujar frame actual del video en el canvas
+            ctx.drawImage(video, 0, 0, vw, vh);
+            
+            // Mostrar estado de proceso
+            statusMsgSpan.innerHTML = "🔍 Procesando imagen con OCR... extrayendo caracteres de la placa.";
+            statusMsgSpan.style.color = "#fff0b5";
+            confidenceBadge.innerHTML = "⏳ leyendo...";
+            ocrRunning = true;
+            
+            try {
+                // Usar Tesseract con idioma español+inglés para mayor precisión en matrículas (incluye números y letras)
+                const { data: { text, confidence } } = await Tesseract.recognize(
+                    canvas,
+                    'spa+eng',
+                    {
+                        logger: (m) => { /* puedes habilitar console.log para debugging pero silencioso para rendimiento */ },
+                        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-',
+                    }
+                );
+                
+                // Texto crudo devuelto por Tesseract
+                const rawOcrText = text.trim();
+                // Limpiar y obtener placa real
+                let finalPlate = cleanAndExtractPlate(rawOcrText);
+                
+                // Si aún está vacío, intentamos buscar con regex más flexible sobre el texto original sin limpieza agresiva
+                if (finalPlate.length < 3 && rawOcrText.length > 0) {
+                    // Intento alternativo: buscar patrones típicos: al menos 2 letras seguidas de 2-4 números y posibles letras finales
+                    const altMatch = rawOcrText.toUpperCase().match(/[A-Z0-9]{5,10}/);
+                    if (altMatch) {
+                        finalPlate = altMatch[0];
+                    } else {
+                        // Si de verdad no encuentra nada, mostrar el texto más alfanumérico posible
+                        const fallbackClean = rawOcrText.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                        if (fallbackClean.length >= 3) finalPlate = fallbackClean.substring(0, 9);
+                    }
+                }
+                
+                const roundedConf = Math.round(confidence);
+                return { 
+                    plate: finalPlate || "", 
+                    confidence: roundedConf,
+                    rawText: rawOcrText.substring(0, 100)
+                };
+            } catch (err) {
+                console.error("Error en OCR:", err);
+                return { 
+                    plate: "", 
+                    confidence: 0, 
+                    rawText: "Error de procesamiento",
+                    error: err 
+                };
+            } finally {
+                ocrRunning = false;
+            }
+        }
+
+        // --- Función principal para capturar y mostrar la placa en la tarjeta ---
+        async function scanAndDisplayPlate() {
+            if (!cameraReady) {
+                statusMsgSpan.innerHTML = "📷 Primero debes iniciar la cámara presionando 'INICIAR CÁMARA'.";
+                statusMsgSpan.style.color = "#ffc49b";
+                return;
+            }
+            
+            // Deshabilitar botón momentáneamente para evitar spam
+            btnCapture.disabled = true;
+            
+            const result = await performOcrOnCurrentFrame();
+            
+            if (result && result.plate && result.plate.length > 0) {
+                // PLACA DETECTADA EXITOSAMENTE -> mostrar en la card exactamente el texto
+                detectedPlateSpan.innerHTML = result.plate;
+                confidenceBadge.innerHTML = `🔍 confianza ${result.confidence}%`;
+                if (result.confidence >= 60) {
+                    confidenceBadge.style.background = "#3b7a5e";
+                    confidenceBadge.style.color = "#ffffff";
+                    statusMsgSpan.innerHTML = `✅ Placa reconocida: ${result.plate} (${result.confidence}% certeza)`;
+                    statusMsgSpan.style.color = "#c6ffdb";
+                } else if (result.confidence >= 35) {
+                    confidenceBadge.style.background = "#b97632";
+                    statusMsgSpan.innerHTML = `⚠️ Placa posible: ${result.plate} (confianza baja: ${result.confidence}%). Verifica visualmente.`;
+                    statusMsgSpan.style.color = "#fff0b3";
+                } else {
+                    confidenceBadge.style.background = "#8b5a2b";
+                    statusMsgSpan.innerHTML = `🔎 Texto extraído: ${result.plate} (confianza baja). Puede no ser exacto.`;
+                    statusMsgSpan.style.color = "#ffdcb0";
+                }
+                // Mostrar info raw adicional (opcional) pero útil para depuración
+                if (result.rawText) {
+                    rawInfoSpan.innerHTML = `🧾 Texto OCR crudo: "${result.rawText}"`;
+                } else {
+                    rawInfoSpan.innerHTML = "";
+                }
+            } else {
+                // No se detectó una placa clara
+                detectedPlateSpan.innerHTML = "❌ No detectada";
+                confidenceBadge.innerHTML = "⚠️ sin datos";
+                statusMsgSpan.innerHTML = "No se pudo leer la placa. Asegura buena iluminación, enfoque y que la matrícula esté visible.";
+                statusMsgSpan.style.color = "#ffc8b0";
+                if (result && result.rawText && result.rawText.length > 0) {
+                    rawInfoSpan.innerHTML = `📄 Texto leído: "${result.rawText.substring(0, 60)}" → no coincide con formato placa.`;
+                } else {
+                    rawInfoSpan.innerHTML = "📌 Intenta acercar la cámara, evitar reflejos y tomar foto con buena luz.";
+                }
+            }
+            
+            // Volver a habilitar botón de escaneo (si la cámara sigue activa)
+            if (cameraReady) {
+                btnCapture.disabled = false;
+            } else {
+                btnCapture.disabled = true;
+            }
+        }
+        
+        // --- Eventos UI ---
+        btnStart.addEventListener('click', async () => {
+            // Al hacer clic en iniciar cámara, reseteamos estado visual y empezamos
+            detectedPlateSpan.innerHTML = "— — —";
+            confidenceBadge.innerHTML = "⚡ esperando lectura";
+            rawInfoSpan.innerHTML = "";
+            await startCamera();
+        });
+        
+        btnCapture.addEventListener('click', () => {
+            if (!cameraReady) {
+                statusMsgSpan.innerHTML = "❌ Cámara no activa. Haz clic en 'INICIAR CÁMARA'.";
+                statusMsgSpan.style.color = "#ffad86";
+                return;
+            }
+            scanAndDisplayPlate();
+        });
+        
+        // Al cargar la página, mostrar estado inicial pero no activar cámara automáticamente (por permisos)
+        statusMsgSpan.innerHTML = "🟢 Presiona 'INICIAR CÁMARA' y permite el acceso. Luego enfoca una placa real.";
+        detectedPlateSpan.innerHTML = "— — —";
+        confidenceBadge.innerHTML = "⚡ listo";
+        
+        // Limpiar recursos al cerrar página
+        window.addEventListener('beforeunload', () => {
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+            }
+        });
+        
+        // Opcional: si por alguna razón el usuario pierde la cámara, manejarlo
+        video.addEventListener('pause', () => {
+            if (cameraReady && mediaStream && mediaStream.active === false) {
+                cameraReady = false;
+                btnCapture.disabled = true;
+                statusMsgSpan.innerHTML = "⚠️ La cámara se detuvo. Reinicia con el botón iniciar.";
+            }
+        });
+    })();
+</script>
+</body>
+</html>
